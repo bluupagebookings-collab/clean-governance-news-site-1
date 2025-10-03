@@ -83,8 +83,7 @@ export async function GET(request: NextRequest) {
       categoryName: categories.name,
       categorySlug: categories.slug
     })
-    .from(stories)
-    .leftJoin(categories, eq(stories.categoryId, categories.id));
+    .from(stories);
 
     const conditions = [];
 
@@ -120,6 +119,8 @@ export async function GET(request: NextRequest) {
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
+
+    query = query.leftJoin(categories, eq(stories.categoryId, categories.id));
 
     // Apply sorting
     const validSortFields = ['publishedAt', 'createdAt', 'title'];
