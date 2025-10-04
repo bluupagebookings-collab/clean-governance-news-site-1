@@ -67,24 +67,7 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || 'createdAt';
     const order = searchParams.get('order') || 'desc';
 
-    let query = db.select({
-      id: stories.id,
-      title: stories.title,
-      slug: stories.slug,
-      excerpt: stories.excerpt,
-      content: stories.content,
-      author: stories.author,
-      image: stories.image,
-      featured: stories.featured,
-      publishedAt: stories.publishedAt,
-      createdAt: stories.createdAt,
-      updatedAt: stories.updatedAt,
-      categoryId: stories.categoryId,
-      categoryName: categories.name,
-      categorySlug: categories.slug
-    })
-    .from(stories);
-
+    // Build conditions array
     const conditions = [];
 
     if (search) {
@@ -116,26 +99,50 @@ export async function GET(request: NextRequest) {
       conditions.push(like(stories.author, `%${author}%`));
     }
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    query = query.leftJoin(categories, eq(stories.categoryId, categories.id));
-
-    // Apply sorting
+    // Determine sort field and order
     const validSortFields = ['publishedAt', 'createdAt', 'title'];
     const sortField = validSortFields.includes(sort) ? sort : 'createdAt';
     const sortOrder = order === 'asc' ? asc : desc;
 
+    // Build base query (select + from only, no joins yet)
+    const baseQuery = db.select({
+      id: stories.id,
+      title: stories.title,
+      slug: stories.slug,
+      excerpt: stories.excerpt,
+      content: stories.content,
+      author: stories.author,
+      image: stories.image,
+      featured: stories.featured,
+      publishedAt: stories.publishedAt,
+      createdAt: stories.createdAt,
+      updatedAt: stories.updatedAt,
+      categoryId: stories.categoryId,
+      categoryName: categories.name,
+      categorySlug: categories.slug
+    })
+    .from(stories);
+
+    // Apply where conditions if needed
+    const filteredQuery = conditions.length > 0 
+      ? baseQuery.where(and(...conditions))
+      : baseQuery;
+
+    // Apply left join to get category data
+    const queryWithJoin = filteredQuery.leftJoin(categories, eq(stories.categoryId, categories.id));
+
+    // Apply sorting
+    let queryWithSort;
     if (sortField === 'publishedAt') {
-      query = query.orderBy(sortOrder(stories.publishedAt));
+      queryWithSort = queryWithJoin.orderBy(sortOrder(stories.publishedAt));
     } else if (sortField === 'createdAt') {
-      query = query.orderBy(sortOrder(stories.createdAt));
-    } else if (sortField === 'title') {
-      query = query.orderBy(sortOrder(stories.title));
+      queryWithSort = queryWithJoin.orderBy(sortOrder(stories.createdAt));
+    } else {
+      queryWithSort = queryWithJoin.orderBy(sortOrder(stories.title));
     }
 
-    const results = await query.limit(limit).offset(offset);
+    // Execute with pagination
+    const results = await queryWithSort.limit(limit).offset(offset);
 
     return NextResponse.json(results);
 
