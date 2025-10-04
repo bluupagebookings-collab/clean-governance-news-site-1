@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     const sortField = validSortFields.includes(sort) ? sort : 'createdAt';
     const sortOrder = order === 'asc' ? asc : desc;
 
-    // Build base query (select + from only, no joins yet)
+    // Stage 1: Build base query with select and from (stories table only)
     const baseQuery = db.select({
       id: stories.id,
       title: stories.title,
@@ -121,28 +121,26 @@ export async function GET(request: NextRequest) {
       categoryName: categories.name,
       categorySlug: categories.slug
     })
-    .from(stories);
+    .from(stories)
+    .leftJoin(categories, eq(stories.categoryId, categories.id));
 
-    // Apply where conditions if needed
+    // Stage 2: Apply where conditions if needed
     const filteredQuery = conditions.length > 0 
       ? baseQuery.where(and(...conditions))
       : baseQuery;
 
-    // Apply left join to get category data
-    const queryWithJoin = filteredQuery.leftJoin(categories, eq(stories.categoryId, categories.id));
-
-    // Apply sorting
-    let queryWithSort;
+    // Stage 3: Apply sorting
+    let finalQuery;
     if (sortField === 'publishedAt') {
-      queryWithSort = queryWithJoin.orderBy(sortOrder(stories.publishedAt));
+      finalQuery = filteredQuery.orderBy(sortOrder(stories.publishedAt));
     } else if (sortField === 'createdAt') {
-      queryWithSort = queryWithJoin.orderBy(sortOrder(stories.createdAt));
+      finalQuery = filteredQuery.orderBy(sortOrder(stories.createdAt));
     } else {
-      queryWithSort = queryWithJoin.orderBy(sortOrder(stories.title));
+      finalQuery = filteredQuery.orderBy(sortOrder(stories.title));
     }
 
-    // Execute with pagination
-    const results = await queryWithSort.limit(limit).offset(offset);
+    // Stage 4: Execute with pagination
+    const results = await finalQuery.limit(limit).offset(offset);
 
     return NextResponse.json(results);
 
