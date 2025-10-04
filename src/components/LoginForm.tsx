@@ -41,8 +41,8 @@ export default function LoginForm() {
       }
 
       // Store bearer token for API calls
-      if (data?.session?.token) {
-        localStorage.setItem("bearer_token", data.session.token)
+      if (data?.token) {
+        localStorage.setItem("bearer_token", data.token)
       }
 
       toast.success("Login successful!")
